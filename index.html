@@ -44,7 +44,7 @@ body {
 .conn-dot.offline { background: var(--ocup); }
 .app-name { font-size: 14px; font-weight: 700; white-space: nowrap; }
 
-.hdr-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; flex-wrap: wrap; }
+.hdr-right { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .hbtn {
   padding: 5px 10px; border-radius: var(--radius);
   border: 1px solid var(--border2); background: var(--surface2);
@@ -970,11 +970,17 @@ async function exportHistory() {
     const hoje=new Date();
     const inicio=new Date(hoje.getFullYear(),hoje.getMonth(),hoje.getDate()).toISOString();
     const fim   =new Date(hoje.getFullYear(),hoje.getMonth(),hoje.getDate()+1).toISOString();
-    const { data, error } = await sb.from('historico_chamadas').select('*')
-      .gte('chamado_em', inicio).lt('chamado_em', fim)
-      .order('chamado_em',{ascending:true});
-    if (error) throw error;
-    if (!data?.length) { toast('Nenhum registro hoje.','warn'); return; }
+    // Busca por liberado_em OU chamado_em (cobre todos os casos)
+    const { data: d1, error: e1 } = await sb.from('historico_chamadas').select('*')
+      .gte('liberado_em', inicio).lt('liberado_em', fim)
+      .order('liberado_em',{ascending:true});
+    const { data: d2 } = await sb.from('historico_chamadas').select('*')
+      .is('liberado_em', null)
+      .gte('chamado_em', inicio).lt('chamado_em', fim);
+    if (e1) throw e1;
+    const seen = new Set();
+    const data = [...(d1||[]), ...(d2||[])].filter(r => { if(seen.has(r.id)) return false; seen.add(r.id); return true; });
+    if (!data.length) { toast('Nenhum registro hoje.','warn'); return; }
 
     const cols=['Vaga','Motorista','Placa','Ciclo','Chamado às','Chegou à vaga','Liberado às','Tempo chamando (min)','Tempo ocupado (min)','Tempo total (min)'];
     const rows=[cols];
