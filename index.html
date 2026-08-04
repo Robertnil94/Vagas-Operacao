@@ -35,10 +35,10 @@ body {
 .header {
   position: sticky; top: 0; z-index: 20;
   background: var(--surface); border-bottom: 1px solid var(--border);
-  display: grid; grid-template-columns: 1fr auto 1fr;
-  align-items: center; padding: 8px 14px; gap: 10px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 14px; gap: 10px;
 }
-.header-left { display: flex; align-items: center; gap: 8px; justify-content: center; }
+.header-left { display: flex; align-items: center; gap: 8px; flex: 1; justify-content: center; }
 .conn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text3); flex-shrink: 0; transition: background .4s; }
 .conn-dot.online  { background: var(--livre); box-shadow: 0 0 6px var(--livre); }
 .conn-dot.offline { background: var(--ocup); }
@@ -111,37 +111,46 @@ body {
 
 /* ── BAY GRID ────────────────────────────────────── */
 .map-wrap { padding: 0 12px 12px; }
-.bay-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 6px; }
+.bay-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(82px, 1fr)); gap: 8px; }
 
 /* ── BAY TILE ────────────────────────────────────── */
 .bay {
-  width: 64px; height: 84px; border-radius: 7px;
+  height: 108px; border-radius: 10px;
   display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 2px;
+  align-items: center; justify-content: flex-end;
+  gap: 3px; padding-bottom: 10px;
   border: 2px solid transparent;
-  cursor: pointer; user-select: none; flex-shrink: 0;
+  cursor: pointer; user-select: none;
   transition: transform .12s; -webkit-tap-highlight-color: transparent;
-  padding: 4px 2px; position: relative;
+  position: relative; overflow: hidden;
 }
-.bay:hover  { transform: scale(1.08); z-index: 2; }
+.bay:hover  { transform: scale(1.06); z-index: 2; }
 .bay:active { transform: scale(1.02); }
-.bay.sel    { box-shadow: 0 0 0 3px #fff; transform: scale(1.05); z-index: 3; }
-.bn  { font-size: 17px; font-weight: 900; line-height: 1; letter-spacing: -.5px; }
-.bpl { font-size: 10px; font-weight: 800; line-height: 1; max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
-.btm { font-size: 11px; font-family: 'SF Mono','Fira Code','Consolas',monospace; font-weight: 700; line-height: 1; }
+.bay.sel    { box-shadow: 0 0 0 3px #fff; transform: scale(1.04); z-index: 3; }
+.bn  { font-size: 22px; font-weight: 900; line-height: 1; letter-spacing: -.5px; }
+.bpl { font-size: 11px; font-weight: 800; line-height: 1; max-width: 78px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+.btm { font-size: 12px; font-family: 'SF Mono','Fira Code','Consolas',monospace; font-weight: 700; line-height: 1; }
+
+/* ── ATENÇÃO: faixa vermelha piscante no topo da vaga ── */
 .bwrn {
-  position: absolute; top: 2px; left: 50%; transform: translateX(-50%);
-  font-size: 14px; line-height: 1; display: none;
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 28px; display: none;
+  align-items: center; justify-content: center; gap: 4px;
+  font-size: 15px; font-weight: 900;
+  background: #f85149; color: #fff;
+  border-radius: 8px 8px 0 0;
+  animation: wrnblink .7s infinite;
 }
+.bwrn-txt { font-size: 10px; font-weight: 800; letter-spacing: .02em; }
+@keyframes wrnblink { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
 
 .livre    { background: var(--livre-bg); color: var(--livre); border-color: var(--livre-bd); }
 .chamando { background: var(--cham-bg);  color: var(--cham);  border-color: var(--cham-bd); animation: champulse 1.8s infinite; }
 .ocupada  { background: var(--ocup-bg);  color: var(--ocup);  border-color: var(--ocup-bd); }
 .agarrada { background: var(--agrd-bg);  color: var(--agrd);  border-color: var(--agrd-bd); animation: agrdpulse 2s infinite; }
-.overdue  { background: rgba(248,81,73,.45) !important; color: #fff !important; border-color: #f85149 !important; animation: overdpulse .9s infinite !important; }
+.overdue  { background: rgba(248,81,73,.28) !important; color: #f85149 !important; border-color: #f85149 !important; }
 @keyframes champulse { 50% { border-color: var(--cham); box-shadow: 0 0 8px rgba(88,166,255,.4); } }
 @keyframes agrdpulse { 50% { border-color: var(--agrd); box-shadow: 0 0 8px rgba(240,136,62,.4); } }
-@keyframes overdpulse { 0%,100% { box-shadow: 0 0 0 0 rgba(248,81,73,0); } 50% { box-shadow: 0 0 16px 4px rgba(248,81,73,.7); } }
 
 /* ── LEGEND ──────────────────────────────────────── */
 .legend { display: flex; gap: 12px; flex-wrap: wrap; padding: 0 14px 10px; }
@@ -309,8 +318,10 @@ body {
 
 <!-- ════════ HEADER ════════ -->
 <header class="header">
-  <div class="header-left">
+  <div style="flex:1;display:flex;align-items:center;gap:6px;">
     <div id="dot" class="conn-dot"></div>
+  </div>
+  <div class="header-left">
     <span class="app-name">Controle de Ondas SMG14 · Nova Lima</span>
   </div>
   <div class="hdr-right">
@@ -585,7 +596,8 @@ function mkBay(id) {
   const num = document.createElement('span'); num.className = 'bn'; num.textContent = id;
   const pla = document.createElement('span'); pla.className = 'bpl'; pla.id = 'bp'+id;
   const tmr = document.createElement('span'); tmr.className = 'btm'; tmr.id = 'bt'+id; tmr.textContent = '00:00';
-  const wrn = document.createElement('span'); wrn.className = 'bwrn'; wrn.id = 'bw'+id; wrn.textContent = '⚠️';
+  const wrn = document.createElement('div'); wrn.className = 'bwrn'; wrn.id = 'bw'+id;
+  wrn.innerHTML = '⚠️ <span class="bwrn-txt">ATENÇÃO</span>';
   d.appendChild(wrn); d.appendChild(num); d.appendChild(pla); d.appendChild(tmr);
   paintBay(id, d);
   return d;
@@ -938,7 +950,7 @@ function tickBayTimers() {
     const b=bays[i];
     tmr.textContent = elapsedStr(b);
     if (pla) pla.textContent = (b.status!=='livre'&&b.placa) ? b.placa : '';
-    if (wrn) wrn.style.display = isOverdue(b) ? 'block' : 'none';
+    if (wrn) wrn.style.display = isOverdue(b) ? 'flex' : 'none';
   }
 }
 
