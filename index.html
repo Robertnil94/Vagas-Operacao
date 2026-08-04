@@ -35,16 +35,25 @@ body {
 .header {
   position: sticky; top: 0; z-index: 20;
   background: var(--surface); border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 14px; gap: 10px;
+  display: flex; align-items: center;
+  padding: 8px 14px; gap: 10px; min-height: 44px;
 }
-.header-left { display: flex; align-items: center; gap: 8px; flex: 1; justify-content: center; }
+.hdr-left { display: flex; align-items: center; gap: 6px; }
+.header-center {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px; pointer-events: none;
+}
 .conn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text3); flex-shrink: 0; transition: background .4s; }
 .conn-dot.online  { background: var(--livre); box-shadow: 0 0 6px var(--livre); }
 .conn-dot.offline { background: var(--ocup); }
 .app-name { font-size: 14px; font-weight: 700; white-space: nowrap; }
+.rotas-badge {
+  background: var(--livre-bg); color: var(--livre); border: 1px solid var(--livre-bd);
+  border-radius: 999px; font-size: 11px; font-weight: 800;
+  padding: 2px 9px; white-space: nowrap; pointer-events: none;
+}
 
-.hdr-right { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.hdr-right { display: flex; align-items: center; gap: 6px; margin-left: auto; flex-shrink: 0; }
 .hbtn {
   padding: 5px 10px; border-radius: var(--radius);
   border: 1px solid var(--border2); background: var(--surface2);
@@ -110,12 +119,12 @@ body {
 @keyframes wavepulse { 0%,100% { box-shadow: none; } 50% { box-shadow: 0 0 8px rgba(227,179,65,.4); } }
 
 /* ── BAY GRID ────────────────────────────────────── */
-.map-wrap { padding: 0 12px 12px; }
-.bay-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(82px, 1fr)); gap: 8px; }
+.map-wrap { padding: 0 10px 10px; }
+.bay-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; }
 
 /* ── BAY TILE ────────────────────────────────────── */
 .bay {
-  height: 108px; border-radius: 10px;
+  height: 90px; border-radius: 10px;
   display: flex; flex-direction: column;
   align-items: center; justify-content: flex-end;
   gap: 3px; padding-bottom: 10px;
@@ -127,9 +136,9 @@ body {
 .bay:hover  { transform: scale(1.06); z-index: 2; }
 .bay:active { transform: scale(1.02); }
 .bay.sel    { box-shadow: 0 0 0 3px #fff; transform: scale(1.04); z-index: 3; }
-.bn  { font-size: 22px; font-weight: 900; line-height: 1; letter-spacing: -.5px; }
-.bpl { font-size: 11px; font-weight: 800; line-height: 1; max-width: 78px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
-.btm { font-size: 12px; font-family: 'SF Mono','Fira Code','Consolas',monospace; font-weight: 700; line-height: 1; }
+.bn  { font-size: 19px; font-weight: 900; line-height: 1; letter-spacing: -.5px; }
+.bpl { font-size: 10px; font-weight: 800; line-height: 1; max-width: 68px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+.btm { font-size: 11px; font-family: 'SF Mono','Fira Code','Consolas',monospace; font-weight: 700; line-height: 1; }
 
 /* ── ATENÇÃO: faixa vermelha piscante no topo da vaga ── */
 .bwrn {
@@ -318,10 +327,11 @@ body {
 
 <!-- ════════ HEADER ════════ -->
 <header class="header">
-  <div style="flex:1;display:flex;align-items:center;gap:6px;">
+  <div class="hdr-left">
     <div id="dot" class="conn-dot"></div>
+    <span id="rotas-badge" class="rotas-badge" style="display:none;">✓ 0 rotas</span>
   </div>
-  <div class="header-left">
+  <div class="header-center">
     <span class="app-name">Controle de Ondas SMG14 · Nova Lima</span>
   </div>
   <div class="hdr-right">
@@ -358,7 +368,7 @@ body {
 <!-- ════════ LEGEND ════════ -->
 <div class="legend">
   <div class="leg"><div class="leg-dot" style="background:var(--livre-bg);border:1.5px solid var(--livre-bd)"></div>Livre</div>
-  <div class="leg"><div class="leg-dot" style="background:var(--cham-bg);border:1.5px solid var(--cham-bd)"></div>Chamando</div>
+  <div class="leg"><div class="leg-dot" style="background:var(--cham-bg);border:1.5px solid var(--cham-bd)"></div>Ociosa</div>
   <div class="leg"><div class="leg-dot" style="background:var(--ocup-bg);border:1.5px solid var(--ocup-bd)"></div>Ocupada</div>
   <div class="leg"><div class="leg-dot" style="background:var(--agrd-bg);border:1.5px solid var(--agrd-bd)"></div>Agarrada</div>
   <div class="leg" style="margin-left:auto;font-size:10px;color:var(--text3);">⚠️ = +20 min</div>
@@ -489,6 +499,7 @@ async function loadBays() {
     startTimer();
     subscribeRT();
     loadHistory();
+    loadWaveStats();
     toast('Conectado!', 'ok');
   } catch(e) {
     console.error(e);
@@ -523,12 +534,53 @@ function subscribeRT() {
     .subscribe();
 }
 
+let closedToday = 0;
+let waveClosedCount = {}; // { waveIdx: N }
+
 async function loadHistory() {
   try {
     const { data } = await sb.from('historico_chamadas').select('*')
       .order('liberado_em', { ascending: false }).limit(20);
     if (data) { calls = data; renderLog(); }
   } catch(e) { console.warn('Histórico indisponível', e); }
+}
+
+async function loadWaveStats() {
+  try {
+    const hoje = new Date();
+    const inicio = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).toISOString();
+    const fim    = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()+1).toISOString();
+    const { data } = await sb.from('historico_chamadas')
+      .select('chamado_em, liberado_em')
+      .gte('liberado_em', inicio).lt('liberado_em', fim);
+    if (!data) return;
+    closedToday = data.length;
+    // Conta fechadas por onda (baseado no horário em que entrou)
+    waveClosedCount = {};
+    ONDAS_AM.forEach((_,i) => { waveClosedCount['AM'+i] = 0; });
+    ONDAS_PM.forEach((_,i) => { waveClosedCount['PM'+i] = 0; });
+    data.forEach(r => {
+      const ts = r.chamado_em || r.liberado_em;
+      if (!ts) return;
+      const d = new Date(ts);
+      const oMin = d.getHours()*60 + d.getMinutes();
+      ONDAS_AM.forEach((o,i) => { if (oMin>=toMin(o.start)&&oMin<toMin(o.end)) waveClosedCount['AM'+i]=(waveClosedCount['AM'+i]||0)+1; });
+      ONDAS_PM.forEach((o,i) => { if (oMin>=toMin(o.start)&&oMin<toMin(o.end)) waveClosedCount['PM'+i]=(waveClosedCount['PM'+i]||0)+1; });
+    });
+    renderRotasBadge();
+    renderWaves();
+  } catch(e) { console.warn('Wave stats indisponível', e); }
+}
+
+function renderRotasBadge() {
+  const el = document.getElementById('rotas-badge');
+  if (!el) return;
+  if (closedToday > 0) {
+    el.textContent = `✓ ${closedToday} rotas`;
+    el.style.display = '';
+  } else {
+    el.style.display = 'none';
+  }
 }
 
 async function persistBay(id, upd) {
@@ -642,7 +694,12 @@ function renderWaves() {
     const chip = document.getElementById('wc'+i);
     if (!chip) return;
     const sc = stuckCount[i];
-    chip.querySelector('.wc-badge-wrap').innerHTML = sc>0 ? `<span class="wc-badge">⚠ ${sc}</span>` : '';
+    const closed = waveClosedCount[ciclo+i] || 0;
+    const pending = Array.from({length:50},(_,k)=>bays[k+1]).filter(b=>b.status!=='livre'&&getBayWaveIdx(b)===i).length;
+    chip.querySelector('.wc-badge-wrap').innerHTML =
+      (sc>0 ? `<span class="wc-badge">⚠ ${sc}</span>` : '') +
+      (closed>0 ? `<span class="wc-badge" style="background:var(--livre-bg);color:var(--livre);border-color:var(--livre-bd);">✓${closed}</span>` : '') +
+      (pending>0&&!sc ? `<span class="wc-badge" style="background:var(--ocup-bg);color:var(--ocup);border-color:var(--ocup-bd);">●${pending}</span>` : '');
     if (sc>0 && now>=e)      { chip.className='wave-chip done has-stuck'; }
     else if (now>=s&&now<e)  { chip.className='wave-chip active'+(sc?' has-stuck':''); active.push(o); }
     else if (now<s)          { chip.className='wave-chip next'; upcoming.push({o,s}); }
@@ -702,7 +759,7 @@ function renderWavePanel() {
 
   const summary=`<div class="wp-summary">
     <span class="wp-sum-chip" style="background:var(--livre-bg);color:var(--livre);border-color:var(--livre-bd);">✓ ${nL} livres</span>
-    ${nC?`<span class="wp-sum-chip" style="background:var(--cham-bg);color:var(--cham);border-color:var(--cham-bd);">📞 ${nC} chamando</span>`:''}
+    ${nC?`<span class="wp-sum-chip" style="background:var(--cham-bg);color:var(--cham);border-color:var(--cham-bd);">💤 ${nC} ociosas</span>`:''}
     ${nO?`<span class="wp-sum-chip" style="background:var(--ocup-bg);color:var(--ocup);border-color:var(--ocup-bd);">● ${nO} ocupadas</span>`:''}
     ${nA?`<span class="wp-sum-chip" style="background:var(--agrd-bg);color:var(--agrd);border-color:var(--agrd-bd);">⚠ ${nA} agarradas</span>`:''}
   </div>`;
@@ -752,7 +809,7 @@ function renderModal() {
   // Header color by status
   let sc, sl;
   if (agar)                   { sc='var(--agrd)'; sl='Agarrada'; }
-  else if (b.status==='chamando') { sc='var(--cham)'; sl='Chamando · a caminho'; }
+  else if (b.status==='chamando') { sc='var(--cham)'; sl='Ociosa'; }
   else if (b.status==='ocupada')  { sc='var(--ocup)'; sl='Ocupada'; }
   else                            { sc='var(--livre)'; sl='Livre'; }
 
@@ -768,7 +825,7 @@ function renderModal() {
   let actions = '';
   if (b.status === 'livre') {
     actions = `<div class="action-row">
-      <div class="act-btn act-cham" onclick="doChamando()">📞 Chamando</div>
+      <div class="act-btn act-cham" onclick="doChamando()">💤 Ociosa</div>
       <div class="act-btn act-ocup" onclick="doOcupar()">✅ Ocupar Vaga</div>
     </div>`;
   } else if (b.status === 'chamando') {
@@ -778,7 +835,7 @@ function renderModal() {
     </div>`;
   } else { // ocupada or agarrada
     actions = `<div class="action-row">
-      <div class="act-btn act-cham"  onclick="doChamando()">📞 Chamar novo</div>
+      <div class="act-btn act-cham"  onclick="doChamando()">💤 Ociosa</div>
       <div class="act-btn act-livre" onclick="doLiberar()">🔓 Liberar Vaga</div>
     </div>`;
   }
@@ -833,7 +890,7 @@ function readInputs() {
 
 function doChamando() {
   if (!selId) return;
-  const { placa, moto } = readInputs();
+  const { placa, moto, obs } = readInputs();
   const now = Date.now();
   bays[selId].status     = 'chamando';
   bays[selId].chamandoAt = now;
@@ -841,12 +898,12 @@ function doChamando() {
   paintBay(selId);
   renderModal();
   persistBay(selId, { status:'chamando', placa, motorista:moto, obs, chamando_em: new Date(now).toISOString() });
-  toast(`📞 Chamando para Vaga ${selId}`, 'ok');
+  toast(`💤 Vaga ${selId} marcada como Ociosa`, 'ok');
 }
 
 function doOcupar() {
   if (!selId) return;
-  const { placa, moto } = readInputs();
+  const { placa, moto, obs } = readInputs();
   const now = Date.now();
   bays[selId].status    = 'ocupada';
   bays[selId].ocupadoAt = now;
@@ -873,6 +930,7 @@ function doLiberar() {
   persistBay(id, { status:'livre', placa:'', motorista:'', obs:'', chamando_em:null, ocupado_em:null });
   toast(`🔓 Vaga ${id} liberada`, 'ok');
   closeModal();
+  loadWaveStats();
 }
 
 // ── RESET ALL ─────────────────────────────────────────
@@ -1023,6 +1081,7 @@ async function exportHistory() {
 
 // ── GLOBALS ──────────────────────────────────────────
 window.setCiclo         = setCiclo;
+window.loadWaveStats    = loadWaveStats;
 window.doChamando       = doChamando;
 window.doOcupar         = doOcupar;
 window.doLiberar        = doLiberar;
