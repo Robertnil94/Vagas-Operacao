@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Operação · Carregamento</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0a0d12;
+  --surface: #131820;
+  --surface2: #1c2330;
+  --border: rgba(255,255,255,.10);
+  --border2: rgba(255,255,255,.18);
+  --text: #f0f6fc;
+  --text2: #a0aab4;
+  --text3: #586070;
+  --radius: 8px;
+
+  --livre:   #3fb950; --livre-bg:  rgba(63,185,80,.18);  --livre-bd:  rgba(63,185,80,.45);
+  --cham:    #58a6ff; --cham-bg:   rgba(88,166,255,.18); --cham-bd:   rgba(88,166,255,.45);
+  --ocup:    #f85149; --ocup-bg:   rgba(248,81,73,.18);  --ocup-bd:   rgba(248,81,73,.45);
+  --agrd:    #f0883e; --agrd-bg:   rgba(240,136,62,.18); --agrd-bd:   rgba(240,136,62,.5);
+  --warn:    #e3b341; --warn-bg:   rgba(227,179,65,.18); --warn-bd:   rgba(227,179,65,.45);
+}
+html, body { height: 100%; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg); color: var(--text);
+  min-height: 100dvh; overscroll-behavior: none;
+}
+
+/* ── HEADER ─────────────────────────────────────── */
+.header {
+  position: sticky; top: 0; z-index: 20;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 14px; gap: 10px; flex-wrap: wrap;
+}
+.header-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.conn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text3); flex-shrink: 0; transition: background .4s; }
+.conn-dot.online  { background: var(--livre); box-shadow: 0 0 6px var(--livre); }
+.conn-dot.offline { background: var(--ocup); }
+.app-name { font-size: 14px; font-weight: 700; white-space: nowrap; }
+
+.hdr-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; flex-wrap: wrap; }
+.hbtn {
+  padding: 5px 10px; border-radius: var(--radius);
+  border: 1px solid var(--border2); background: var(--surface2);
+  color: var(--text2); font-size: 12px; cursor: pointer; white-space: nowrap;
+}
+.hbtn:hover { color: var(--text); }
+.hbtn.danger { color: var(--ocup); border-color: var(--ocup-bd); }
+.hbtn.danger:hover { background: var(--ocup-bg); }
+.timer-btn {
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 11px; border-radius: var(--radius);
+  border: 1px solid var(--border2); background: var(--surface2); color: var(--text);
+  font-size: 13px; font-weight: 700; cursor: pointer;
+  font-family: 'SF Mono','Fira Code','Consolas',monospace; white-space: nowrap;
+}
+.timer-btn.warn   { border-color: var(--warn-bd); color: var(--warn); }
+.timer-btn.urgent { border-color: var(--ocup-bd); color: var(--ocup); animation: blink 1s infinite; }
+@keyframes blink { 50% { opacity: .5; } }
+
+/* ── CICLO TABS ──────────────────────────────────── */
+.cycle-wrap { padding: 8px 12px 0; }
+.cycle-tabs { display: flex; gap: 6px; background: var(--surface); border: 1px solid var(--border2); border-radius: 10px; padding: 4px; width: fit-content; }
+.cycle-tab {
+  padding: 6px 22px; border-radius: 7px; font-size: 13px; font-weight: 700;
+  cursor: pointer; border: none; background: transparent; color: var(--text2);
+  transition: background .15s, color .15s;
+}
+.cycle-tab.active { background: var(--surface2); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,.3); }
+
+/* ── WAVE BAR ────────────────────────────────────── */
+.wave-section { padding: 8px 12px 4px; }
+.wave-status {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: var(--radius); padding: 10px 14px; margin-bottom: 8px;
+}
+.wave-label { font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
+.wave-current { font-size: 19px; font-weight: 800; color: var(--warn); flex: 1; }
+.wave-current.none { font-size: 13px; color: var(--text3); font-weight: 600; }
+.wave-next-wrap { font-size: 11px; color: var(--text2); text-align: right; line-height: 1.4; white-space: nowrap; }
+.wave-next-wrap strong { color: var(--text); display: block; }
+.wave-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+.wave-chip {
+  flex: 1; min-width: 70px; padding: 6px 4px; border-radius: 6px; text-align: center;
+  border: 1.5px solid var(--border); background: var(--surface);
+  cursor: pointer; user-select: none; transition: transform .1s;
+  -webkit-tap-highlight-color: transparent;
+}
+.wave-chip:hover  { transform: scale(1.04); }
+.wave-chip:active { transform: scale(.97); }
+.wave-chip .wc-name { font-size: 12px; font-weight: 700; color: var(--text2); line-height: 1; }
+.wave-chip .wc-time { font-size: 10px; color: var(--text3); margin-top: 2px; line-height: 1; font-family: monospace; }
+.wave-chip .wc-badge { display: inline-block; background: var(--agrd-bg); color: var(--agrd); border: 1px solid var(--agrd-bd); border-radius: 3px; font-size: 9px; font-weight: 800; padding: 0 4px; margin-top: 3px; line-height: 1.4; }
+.wave-chip.active   { background: rgba(227,179,65,.16); border-color: var(--warn-bd); animation: wavepulse 2s infinite; }
+.wave-chip.active .wc-name { color: var(--warn); }
+.wave-chip.active .wc-time { color: var(--warn); opacity: .8; }
+.wave-chip.next     { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.2); }
+.wave-chip.next .wc-name   { color: var(--text); }
+.wave-chip.next .wc-time   { color: var(--text2); }
+.wave-chip.done .wc-name, .wave-chip.done .wc-time { opacity: .3; }
+.wave-chip.has-stuck { border-color: var(--agrd-bd) !important; }
+.wave-chip.has-stuck .wc-name { color: var(--agrd) !important; opacity: 1 !important; }
+@keyframes wavepulse { 0%,100% { box-shadow: none; } 50% { box-shadow: 0 0 8px rgba(227,179,65,.4); } }
+
+/* ── BAY GRID ────────────────────────────────────── */
+.map-wrap { padding: 0 12px 12px; }
+.bay-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 6px; }
+
+/* ── BAY TILE ────────────────────────────────────── */
+.bay {
+  width: 64px; height: 84px; border-radius: 7px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 2px;
+  border: 2px solid transparent;
+  cursor: pointer; user-select: none; flex-shrink: 0;
+  transition: transform .12s; -webkit-tap-highlight-color: transparent;
+  padding: 4px 2px; position: relative;
+}
+.bay:hover  { transform: scale(1.08); z-index: 2; }
+.bay:active { transform: scale(1.02); }
+.bay.sel    { box-shadow: 0 0 0 3px #fff; transform: scale(1.05); z-index: 3; }
+.bn  { font-size: 17px; font-weight: 900; line-height: 1; letter-spacing: -.5px; }
+.bpl { font-size: 10px; font-weight: 800; line-height: 1; max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+.btm { font-size: 11px; font-family: 'SF Mono','Fira Code','Consolas',monospace; font-weight: 700; line-height: 1; }
+.bwrn {
+  position: absolute; top: 3px; right: 4px;
+  font-size: 11px; line-height: 1; display: none;
+}
+
+.livre    { background: var(--livre-bg); color: var(--livre); border-color: var(--livre-bd); }
+.chamando { background: var(--cham-bg);  color: var(--cham);  border-color: var(--cham-bd); animation: champulse 1.8s infinite; }
+.ocupada  { background: var(--ocup-bg);  color: var(--ocup);  border-color: var(--ocup-bd); }
+.agarrada { background: var(--agrd-bg);  color: var(--agrd);  border-color: var(--agrd-bd); animation: agrdpulse 2s infinite; }
+@keyframes champulse { 50% { border-color: var(--cham); box-shadow: 0 0 8px rgba(88,166,255,.4); } }
+@keyframes agrdpulse { 50% { border-color: var(--agrd); box-shadow: 0 0 8px rgba(240,136,62,.4); } }
+
+/* ── LEGEND ──────────────────────────────────────── */
+.legend { display: flex; gap: 12px; flex-wrap: wrap; padding: 0 14px 10px; }
+.leg { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text2); font-weight: 600; }
+.leg-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+/* ── LOG ─────────────────────────────────────────── */
+.log-section { padding: 0 14px 20px; }
+.log-hdr { font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
+.log-list { display: flex; flex-direction: column; gap: 4px; max-height: 160px; overflow-y: auto; }
+.log-row { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.log-badge { background: var(--cham-bg); color: var(--cham); border: 1px solid var(--cham-bd); border-radius: 3px; padding: 1px 6px; font-size: 10px; font-weight: 800; white-space: nowrap; }
+.log-name  { font-size: 12px; color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.log-time  { font-size: 11px; color: var(--text3); font-family: monospace; white-space: nowrap; }
+.log-empty { font-size: 12px; color: var(--text3); font-style: italic; padding: 6px 0; }
+
+/* ── BAY MODAL ───────────────────────────────────── */
+.modal-bg {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0,0,0,.75); display: none;
+  align-items: flex-end; justify-content: center;
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+}
+.modal-bg.open { display: flex; }
+@media (min-height: 580px) and (min-width: 420px) {
+  .modal-bg { align-items: center; }
+  .modal-box { border-radius: 14px; max-width: 420px; margin: 0 auto; }
+}
+.modal-box {
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: 16px 16px 0 0; width: 100%; padding: 20px 20px 30px;
+  max-height: 92dvh; overflow-y: auto; animation: slideUp .22s ease;
+}
+@keyframes slideUp { from { transform: translateY(30px); opacity: 0; } }
+.modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.modal-badge {
+  width: 48px; height: 48px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: 900; border: 2px solid transparent;
+}
+.modal-info { margin-left: 12px; }
+.modal-title { font-size: 18px; font-weight: 800; }
+.modal-sub   { font-size: 13px; margin-top: 2px; font-weight: 600; }
+.close-btn {
+  width: 32px; height: 32px; border-radius: 50%;
+  border: 1px solid var(--border2); background: transparent;
+  color: var(--text2); font-size: 18px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.close-btn:hover { background: var(--surface2); color: var(--text); }
+.sect-label { font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
+.drv-input {
+  width: 100%; background: var(--surface2);
+  border: 1px solid var(--border2); border-radius: var(--radius);
+  color: var(--text); font-size: 15px; font-weight: 600; padding: 11px 13px;
+  outline: none; -webkit-appearance: none; margin-bottom: 10px;
+}
+.drv-input:focus { border-color: var(--cham); }
+.drv-input::placeholder { color: var(--text3); font-weight: 400; }
+.agar-banner {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--agrd-bg); border: 1px solid var(--agrd-bd);
+  border-radius: var(--radius); padding: 12px; margin-bottom: 14px;
+}
+.agar-banner-title { font-weight: 700; color: var(--agrd); font-size: 13px; }
+.agar-banner-sub   { font-size: 11px; color: var(--text2); margin-top: 2px; }
+.warn-banner {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--warn-bg); border: 1px solid var(--warn-bd);
+  border-radius: var(--radius); padding: 10px 12px; margin-bottom: 14px;
+  font-size: 13px; font-weight: 700; color: var(--warn);
+}
+
+/* Action buttons */
+.action-row { display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+.act-btn {
+  flex: 1; min-width: 100px;
+  padding: 12px 10px; border-radius: var(--radius);
+  font-size: 13px; font-weight: 800; text-align: center;
+  cursor: pointer; border: 2px solid transparent;
+  -webkit-tap-highlight-color: transparent; white-space: nowrap;
+}
+.act-btn:active { opacity: .8; }
+.act-cham  { background: var(--cham-bg);  color: var(--cham);  border-color: var(--cham-bd); }
+.act-ocup  { background: var(--ocup-bg);  color: var(--ocup);  border-color: var(--ocup-bd); }
+.act-livre { background: var(--livre-bg); color: var(--livre); border-color: var(--livre-bd); }
+
+/* ── WAVE PANEL ──────────────────────────────────── */
+.wpanel-bg {
+  position: fixed; inset: 0; z-index: 110;
+  background: rgba(0,0,0,.75); display: none;
+  align-items: flex-end; justify-content: center;
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+}
+.wpanel-bg.open { display: flex; }
+.wpanel-box {
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: 16px 16px 0 0; width: 100%;
+  padding: 16px 16px 32px; max-height: 92dvh; overflow-y: auto;
+  animation: slideUp .22s ease;
+}
+.wpanel-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+.wpanel-title { font-size: 18px; font-weight: 800; }
+.wpanel-sub   { font-size: 13px; color: var(--text2); margin-top: 3px; font-weight: 600; }
+.wpanel-status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; margin-top: 6px; }
+.wp-summary { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.wp-sum-chip { padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; border: 1px solid transparent; }
+.wp-mini-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 5px; }
+.wp-mini-bay {
+  height: 72px; border-radius: 6px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 2px;
+  border: 2px solid transparent; cursor: pointer;
+  user-select: none; transition: transform .1s; padding: 3px 2px; position: relative;
+}
+.wp-mini-bay:hover  { transform: scale(1.06); z-index: 2; }
+.wp-mini-bay:active { transform: scale(.97); }
+.wp-mini-bay .wm-n  { font-size: 15px; font-weight: 900; line-height: 1; }
+.wp-mini-bay .wm-pl { font-size: 9px; font-weight: 800; line-height: 1; max-width: 52px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+.wp-mini-bay .wm-tm { font-size: 10px; font-family: monospace; font-weight: 700; line-height: 1; }
+.wp-mini-bay .wm-wr { position: absolute; top: 2px; right: 3px; font-size: 10px; display: none; }
+.wp-mini-bay.livre    { background: var(--livre-bg); color: var(--livre); border-color: var(--livre-bd); }
+.wp-mini-bay.chamando { background: var(--cham-bg);  color: var(--cham);  border-color: var(--cham-bd); animation: champulse 1.8s infinite; }
+.wp-mini-bay.ocupada  { background: var(--ocup-bg);  color: var(--ocup);  border-color: var(--ocup-bd); }
+.wp-mini-bay.agarrada { background: var(--agrd-bg);  color: var(--agrd);  border-color: var(--agrd-bd); animation: agrdpulse 2s infinite; }
+
+/* ── TOAST ───────────────────────────────────────── */
+.toast {
+  position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+  background: #1f6feb; color: #fff;
+  padding: 10px 18px; border-radius: 999px;
+  font-size: 13px; font-weight: 600; z-index: 300; pointer-events: none;
+  opacity: 0; transition: opacity .25s;
+  max-width: calc(100vw - 32px); text-align: center; white-space: nowrap;
+}
+.toast.show { opacity: 1; }
+.toast.warn  { background: #9e6a03; }
+.toast.ok    { background: #1a7f37; }
+.toast.err   { background: #b91c1c; }
+
+/* ── LOADING ─────────────────────────────────────── */
+.cfg-overlay {
+  position: fixed; inset: 0; z-index: 400; background: var(--bg);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.cfg-card { background: var(--surface); border: 1px solid var(--border2); border-radius: 14px; padding: 28px; width: 100%; max-width: 400px; text-align: center; }
+.cfg-logo  { font-size: 32px; margin-bottom: 12px; }
+.cfg-title { font-size: 18px; font-weight: 800; margin-bottom: 8px; }
+.cfg-desc  { font-size: 13px; color: var(--text2); }
+</style>
+</head>
+<body>
+
+<!-- ════════ LOADING ════════ -->
+<div id="cfg" class="cfg-overlay">
+  <div class="cfg-card">
+    <div class="cfg-logo">⚡</div>
+    <div class="cfg-title">Operação · Carregamento</div>
+    <div class="cfg-desc">Conectando…</div>
+  </div>
+</div>
+
+<!-- ════════ TOAST ════════ -->
+<div id="toast" class="toast"></div>
+
+<!-- ════════ HEADER ════════ -->
+<header class="header">
+  <div class="header-left">
+    <div id="dot" class="conn-dot"></div>
+    <span class="app-name">Vagas de Carregamento</span>
+  </div>
+  <div class="hdr-right">
+    <button id="timer-btn" class="timer-btn" title="Tempo do ciclo">⏱ <span id="timer-txt">30:00</span></button>
+    <button class="hbtn" onclick="resetTimer()">↺</button>
+    <button class="hbtn" onclick="exportHistory()">📥 Histórico</button>
+    <button class="hbtn danger" onclick="resetAllBays()">🗑 Reset</button>
+  </div>
+</header>
+
+<!-- ════════ TABS AM/PM ════════ -->
+<div class="cycle-wrap">
+  <div class="cycle-tabs">
+    <button id="tab-am" class="cycle-tab" onclick="setCiclo('AM')">AM</button>
+    <button id="tab-pm" class="cycle-tab" onclick="setCiclo('PM')">PM</button>
+  </div>
+</div>
+
+<!-- ════════ ONDAS ════════ -->
+<div class="wave-section">
+  <div class="wave-status">
+    <div style="flex:1;">
+      <div class="wave-label">Onda ativa · Ciclo <span id="ciclo-label">PM</span></div>
+      <div id="wave-current" class="wave-current none">Fora do ciclo</div>
+    </div>
+    <div id="wave-next-wrap" class="wave-next-wrap" style="display:none;"></div>
+  </div>
+  <div class="wave-chips" id="wave-chips"></div>
+</div>
+
+<!-- ════════ BAY GRID ════════ -->
+<div class="map-wrap">
+  <div class="bay-grid" id="bay-grid"></div>
+</div>
+
+<!-- ════════ LEGEND ════════ -->
+<div class="legend">
+  <div class="leg"><div class="leg-dot" style="background:var(--livre-bg);border:1.5px solid var(--livre-bd)"></div>Livre</div>
+  <div class="leg"><div class="leg-dot" style="background:var(--cham-bg);border:1.5px solid var(--cham-bd)"></div>Chamando</div>
+  <div class="leg"><div class="leg-dot" style="background:var(--ocup-bg);border:1.5px solid var(--ocup-bd)"></div>Ocupada</div>
+  <div class="leg"><div class="leg-dot" style="background:var(--agrd-bg);border:1.5px solid var(--agrd-bd)"></div>Agarrada</div>
+  <div class="leg" style="margin-left:auto;font-size:10px;color:var(--text3);">⚠️ = +20 min</div>
+</div>
+
+<!-- ════════ LOG ════════ -->
+<div class="log-section">
+  <div class="log-hdr">Liberações recentes</div>
+  <div id="log" class="log-list"><div class="log-empty">Nenhum registro ainda.</div></div>
+</div>
+
+<!-- ════════ BAY MODAL ════════ -->
+<div id="modal" class="modal-bg" onclick="bgClose(event)">
+  <div class="modal-box" id="modal-box"></div>
+</div>
+
+<!-- ════════ WAVE PANEL ════════ -->
+<div id="wpanel" class="wpanel-bg" onclick="bgCloseWave(event)">
+  <div class="wpanel-box" id="wpanel-box"></div>
+</div>
+
+<!-- ════════ SCRIPT ════════ -->
+<script>
+// ── ONDAS ────────────────────────────────────────────
+const ONDAS_AM = [
+  { n:'1ª Onda', start:'06:30', end:'07:15' },
+  { n:'2ª Onda', start:'07:15', end:'08:00' },
+  { n:'3ª Onda', start:'08:00', end:'08:37' },
+  { n:'4ª Onda', start:'08:30', end:'09:07' },
+  { n:'5ª Onda', start:'09:00', end:'09:37' },
+  { n:'6ª Onda', start:'09:30', end:'10:07' },
+];
+const ONDAS_PM = [
+  { n:'1ª Onda', start:'13:00', end:'13:37' },
+  { n:'2ª Onda', start:'13:30', end:'14:07' },
+  { n:'3ª Onda', start:'14:00', end:'14:37' },
+  { n:'4ª Onda', start:'14:30', end:'15:07' },
+  { n:'5ª Onda', start:'15:00', end:'16:07' },
+  { n:'6ª Onda', start:'16:00', end:'16:37' },
+];
+let ciclo = localStorage.getItem('ciclo') || 'PM';
+let ONDAS = ciclo === 'AM' ? ONDAS_AM : ONDAS_PM;
+
+function setCiclo(c) {
+  ciclo = c;
+  localStorage.setItem('ciclo', c);
+  ONDAS = c === 'AM' ? ONDAS_AM : ONDAS_PM;
+  document.getElementById('tab-am').className = 'cycle-tab' + (c==='AM'?' active':'');
+  document.getElementById('tab-pm').className = 'cycle-tab' + (c==='PM'?' active':'');
+  document.getElementById('ciclo-label').textContent = c;
+  // Rebuild wave chips
+  const chips = document.getElementById('wave-chips');
+  chips.innerHTML = '';
+  renderWaves();
+}
+
+function toMin(hhmm) { const [h,m]=hhmm.split(':').map(Number); return h*60+m; }
+function nowMin()    { const d=new Date(); return d.getHours()*60+d.getMinutes(); }
+
+// Wave index from timestamp (or next upcoming wave for advance loading)
+function getBayWaveIdx(bay) {
+  if (bay.status === 'livre' || (!bay.chamandoAt && !bay.ocupadoAt)) return null;
+  const ref = bay.chamandoAt || bay.ocupadoAt;
+  const d = new Date(ref);
+  const oMin = d.getHours()*60 + d.getMinutes();
+  let result = null;
+  ONDAS.forEach((o,i) => { if (oMin >= toMin(o.start) && oMin < toMin(o.end)) result = i; });
+  if (result !== null) return result;
+  for (let i=0; i<ONDAS.length; i++) { if (oMin < toMin(ONDAS[i].start)) return i; }
+  return null;
+}
+
+function isAgarrada(bay) {
+  if (bay.status === 'livre') return false;
+  const idx = getBayWaveIdx(bay);
+  if (idx === null) return false;
+  return nowMin() >= toMin(ONDAS[idx].end);
+}
+
+function isOverdue(bay) {
+  // Atenção ⚠️ quando vaga está ocupada há mais de 20 minutos
+  if (bay.status !== 'ocupada' || !bay.ocupadoAt) return false;
+  return (Date.now() - bay.ocupadoAt) > 20 * 60 * 1000;
+}
+
+// ── STATE ────────────────────────────────────────────
+let bays = {};
+for (let i=1; i<=50; i++) bays[i] = { id:i, status:'livre', placa:'', motorista:'', chamandoAt:null, ocupadoAt:null, statusAt:null };
+
+let selId   = null;
+let calls   = [];
+let timer   = 1800;
+let timerTm = null;
+let sb      = null;
+let currentWavePanelIdx = null;
+
+// ── SUPABASE ─────────────────────────────────────────
+const SUPABASE_URL = 'https://oouwhcxxsspmdultfkjf.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9vdXdoY3h4c3NwbWR1bHRma2pmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NTMwMzYsImV4cCI6MjEwMTMyOTAzNn0.MgkXdUpxvqBJpH_WJWG2Ux6BKdwjxmvkqQvHR3OuP1w';
+
+(function boot() {
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  setCiclo(ciclo); // set tabs
+  loadBays();
+})();
+
+async function loadBays() {
+  try {
+    const { data, error } = await sb.from('vagas').select('*').order('id');
+    if (error) throw error;
+    data.forEach(r => {
+      const st = r.status || 'livre';
+      bays[r.id] = {
+        id:         r.id,
+        status:     st,
+        placa:      r.placa      || '',
+        motorista:  r.motorista  || '',
+        chamandoAt: r.chamando_em ? new Date(r.chamando_em).getTime() : null,
+        ocupadoAt:  r.ocupado_em  ? new Date(r.ocupado_em).getTime()  : null,
+        statusAt:   r.atualizado_em ? new Date(r.atualizado_em).getTime() : null,
+      };
+    });
+    document.getElementById('cfg').style.display = 'none';
+    document.getElementById('dot').className = 'conn-dot online';
+    initUI();
+    renderWaves();
+    startTimer();
+    subscribeRT();
+    loadHistory();
+    toast('Conectado!', 'ok');
+  } catch(e) {
+    console.error(e);
+    document.getElementById('cfg').querySelector('.cfg-desc').textContent = 'Erro ao conectar. Recarregue.';
+  }
+}
+
+function subscribeRT() {
+  sb.channel('vagas-rt')
+    .on('postgres_changes', { event:'*', schema:'public', table:'vagas' }, p => {
+      const r = p.new || {};
+      if (!r.id || !bays[r.id]) return;
+      const prevSt = bays[r.id].status;
+      const newSt  = r.status || 'livre';
+      bays[r.id] = {
+        id:        r.id,
+        status:    newSt,
+        placa:     r.placa     || '',
+        motorista: r.motorista || '',
+        chamandoAt: r.chamando_em ? new Date(r.chamando_em).getTime() : null,
+        ocupadoAt:  r.ocupado_em  ? new Date(r.ocupado_em).getTime()  : null,
+        statusAt:   r.atualizado_em ? new Date(r.atualizado_em).getTime() : null,
+      };
+      paintBay(r.id);
+      if (selId === r.id) renderModal();
+    })
+    .on('postgres_changes', { event:'INSERT', schema:'public', table:'historico_chamadas' }, p => {
+      const r = p.new;
+      if (r) addLogEntry(r);
+    })
+    .subscribe();
+}
+
+async function loadHistory() {
+  try {
+    const { data } = await sb.from('historico_chamadas').select('*')
+      .order('liberado_em', { ascending: false }).limit(20);
+    if (data) { calls = data; renderLog(); }
+  } catch(e) { console.warn('Histórico indisponível', e); }
+}
+
+async function persistBay(id, upd) {
+  if (!sb) return;
+  const now = new Date().toISOString();
+  // Core fields — always works without migration
+  // 'chamando' status falls back to 'ocupada' if constraint not yet updated
+  const core = {
+    status:     upd.status,
+    placa:      upd.placa      ?? '',
+    motorista:  upd.motorista  ?? '',
+    atualizado_em: now
+  };
+  // 'chamando' só funciona no DB após rodar supabase-migration.sql
+  // Até lá, salva como 'ocupada' para garantir persistência
+  const dbStatus = (core.status === 'chamando') ? 'ocupada' : core.status;
+  try {
+    await sb.from('vagas').upsert({ id, ...core, status: dbStatus }, { onConflict: 'id' });
+  } catch(e) {
+    console.warn('Erro ao salvar vaga', e);
+  }
+  // Timing columns — silently ignored if migration not applied yet
+  const timings = {};
+  if ('chamando_em' in upd) timings.chamando_em = upd.chamando_em;
+  if ('ocupado_em'  in upd) timings.ocupado_em  = upd.ocupado_em;
+  if (Object.keys(timings).length) {
+    try { await sb.from('vagas').update(timings).eq('id', id); } catch(e) {}
+  }
+}
+
+async function persistLiberation(id) {
+  if (!sb) return;
+  const b = bays[id];
+  const now = new Date().toISOString();
+  const chamSec = (b.chamandoAt && b.ocupadoAt) ? Math.round((b.ocupadoAt - b.chamandoAt)/1000) : null;
+  const ocSec   = b.ocupadoAt ? Math.round((Date.now() - b.ocupadoAt)/1000) : null;
+  const totalSec = b.chamandoAt ? Math.round((Date.now() - b.chamandoAt)/1000) : null;
+  try {
+    const { data } = await sb.from('historico_chamadas').insert({
+      vaga_id:           id,
+      motorista:         b.motorista || '',
+      placa:             b.placa     || '',
+      chamado_em:        b.chamandoAt ? new Date(b.chamandoAt).toISOString() : null,
+      ocupado_em:        b.ocupadoAt  ? new Date(b.ocupadoAt).toISOString()  : null,
+      liberado_em:       now,
+      tempo_chamando_seg: chamSec,
+      tempo_ocupado_seg:  ocSec,
+      tempo_total_seg:    totalSec,
+      ciclo:             ciclo,
+    }).select().single();
+    if (data) addLogEntry(data);
+  } catch(e) { console.warn('Erro ao registrar liberação', e); }
+}
+
+// ── UI INIT ──────────────────────────────────────────
+function initUI() {
+  const grid = document.getElementById('bay-grid');
+  for (let i=1; i<=50; i++) grid.appendChild(mkBay(i));
+}
+
+function mkBay(id) {
+  const d = document.createElement('div');
+  d.id = 'b' + id; d.onclick = () => openModal(id); d.title = 'Vaga ' + id;
+  const num = document.createElement('span'); num.className = 'bn'; num.textContent = id;
+  const pla = document.createElement('span'); pla.className = 'bpl'; pla.id = 'bp'+id;
+  const tmr = document.createElement('span'); tmr.className = 'btm'; tmr.id = 'bt'+id; tmr.textContent = '00:00';
+  const wrn = document.createElement('span'); wrn.className = 'bwrn'; wrn.id = 'bw'+id; wrn.textContent = '⚠️';
+  d.appendChild(wrn); d.appendChild(num); d.appendChild(pla); d.appendChild(tmr);
+  paintBay(id, d);
+  return d;
+}
+
+function paintBay(id, el) {
+  el = el || document.getElementById('b'+id);
+  if (!el) return;
+  const b = bays[id];
+  const cls = isAgarrada(b) ? 'agarrada' : b.status;
+  el.className = 'bay ' + cls + (selId===id ? ' sel' : '');
+}
+
+// ── WAVES ────────────────────────────────────────────
+function renderWaves() {
+  const now = nowMin();
+  const chips = document.getElementById('wave-chips');
+  const curEl = document.getElementById('wave-current');
+  const nxtWrap = document.getElementById('wave-next-wrap');
+  if (!chips || !curEl) return;
+
+  if (!chips.children.length) {
+    ONDAS.forEach((o,i) => {
+      const c = document.createElement('div');
+      c.id = 'wc'+i; c.onclick = () => openWavePanel(i);
+      c.innerHTML = `<div class="wc-name">${o.n}</div><div class="wc-time">${o.start}–${o.end}</div><div class="wc-badge-wrap"></div>`;
+      chips.appendChild(c);
+    });
+  }
+
+  const stuckCount = new Array(ONDAS.length).fill(0);
+  for (let i=1; i<=50; i++) {
+    if (!isAgarrada(bays[i])) continue;
+    const wIdx = getBayWaveIdx(bays[i]);
+    if (wIdx !== null) stuckCount[wIdx]++;
+  }
+
+  const active=[], upcoming=[];
+  ONDAS.forEach((o,i) => {
+    const s=toMin(o.start), e=toMin(o.end);
+    const chip = document.getElementById('wc'+i);
+    if (!chip) return;
+    const sc = stuckCount[i];
+    chip.querySelector('.wc-badge-wrap').innerHTML = sc>0 ? `<span class="wc-badge">⚠ ${sc}</span>` : '';
+    if (sc>0 && now>=e)      { chip.className='wave-chip done has-stuck'; }
+    else if (now>=s&&now<e)  { chip.className='wave-chip active'+(sc?' has-stuck':''); active.push(o); }
+    else if (now<s)          { chip.className='wave-chip next'; upcoming.push({o,s}); }
+    else                     { chip.className='wave-chip done'; }
+  });
+
+  if (active.length) {
+    const main=active[active.length-1];
+    curEl.className='wave-current';
+    curEl.textContent='📦 '+main.n+'  '+main.start+'–'+main.end;
+    if (upcoming.length) {
+      const nx=upcoming[0], diff=nx.s-now;
+      const hm=diff>=60?Math.floor(diff/60)+'h '+(diff%60)+'min':diff+'min';
+      nxtWrap.style.display=''; nxtWrap.innerHTML=`<strong>${nx.o.n}</strong>em ${hm}`;
+    } else nxtWrap.style.display='none';
+  } else if (upcoming.length) {
+    const nx=upcoming[0], diff=nx.s-now;
+    const hm=diff>=60?Math.floor(diff/60)+'h '+(diff%60)+'min':diff+'min';
+    curEl.className='wave-current none';
+    curEl.textContent='Próxima: '+nx.o.n+' em '+hm;
+    nxtWrap.style.display='none';
+  } else {
+    curEl.className='wave-current none';
+    curEl.textContent='Ciclo '+ciclo+' encerrado';
+    nxtWrap.style.display='none';
+  }
+}
+
+// ── WAVE PANEL ───────────────────────────────────────
+function openWavePanel(idx) {
+  currentWavePanelIdx = idx;
+  renderWavePanel();
+  document.getElementById('wpanel').classList.add('open');
+}
+function renderWavePanel() {
+  const idx = currentWavePanelIdx;
+  if (idx===null) return;
+  const o=ONDAS[idx], now=nowMin(), s=toMin(o.start), e=toMin(o.end);
+  let stateHtml;
+  if (now<s) {
+    const diff=s-now, hm=diff>=60?Math.floor(diff/60)+'h '+(diff%60)+'min':diff+'min';
+    stateHtml=`<span class="wpanel-status-badge" style="background:rgba(255,255,255,.06);color:var(--text2);border:1px solid var(--border2);">⏳ Começa em ${hm}</span>`;
+  } else if (now>=s&&now<e) {
+    stateHtml=`<span class="wpanel-status-badge" style="background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-bd);">● Ativa agora</span>`;
+  } else {
+    stateHtml=`<span class="wpanel-status-badge" style="background:rgba(255,255,255,.04);color:var(--text3);border:1px solid var(--border);">✓ Encerrada</span>`;
+  }
+
+  let nL=0,nC=0,nO=0,nA=0;
+  for (let i=1;i<=50;i++) {
+    const b=bays[i];
+    if (b.status==='livre') nL++;
+    else if (isAgarrada(b)) nA++;
+    else if (b.status==='chamando') nC++;
+    else nO++;
+  }
+
+  const summary=`<div class="wp-summary">
+    <span class="wp-sum-chip" style="background:var(--livre-bg);color:var(--livre);border-color:var(--livre-bd);">✓ ${nL} livres</span>
+    ${nC?`<span class="wp-sum-chip" style="background:var(--cham-bg);color:var(--cham);border-color:var(--cham-bd);">📞 ${nC} chamando</span>`:''}
+    ${nO?`<span class="wp-sum-chip" style="background:var(--ocup-bg);color:var(--ocup);border-color:var(--ocup-bd);">● ${nO} ocupadas</span>`:''}
+    ${nA?`<span class="wp-sum-chip" style="background:var(--agrd-bg);color:var(--agrd);border-color:var(--agrd-bd);">⚠ ${nA} agarradas</span>`:''}
+  </div>`;
+
+  let tiles='';
+  for (let i=1;i<=50;i++) {
+    const b=bays[i];
+    const cls=isAgarrada(b)?'agarrada':b.status;
+    const timer=elapsedStr(b);
+    const placa=(b.status!=='livre'&&b.placa)?b.placa:'';
+    const od=isOverdue(b);
+    tiles+=`<div class="wp-mini-bay ${cls}" onclick="openModalFromPanel(${i})">
+      <span class="wm-wr" style="${od?'display:block':''}">⚠️</span>
+      <span class="wm-n">${i}</span>
+      <span class="wm-pl">${placa}</span>
+      <span class="wm-tm">${timer}</span>
+    </div>`;
+  }
+
+  document.getElementById('wpanel-box').innerHTML=`
+    <div class="wpanel-head">
+      <div><div class="wpanel-title">${o.n}</div><div class="wpanel-sub">${o.start} – ${o.end}</div>${stateHtml}</div>
+      <button class="close-btn" onclick="closeWavePanel()">✕</button>
+    </div>
+    ${summary}
+    <div class="wp-mini-grid">${tiles}</div>`;
+}
+function closeWavePanel() { document.getElementById('wpanel').classList.remove('open'); currentWavePanelIdx=null; }
+function bgCloseWave(e) { if(e.target===document.getElementById('wpanel')) closeWavePanel(); }
+function openModalFromPanel(id) { closeWavePanel(); openModal(id); }
+
+// ── MODAL ────────────────────────────────────────────
+function openModal(id) {
+  if (selId) { paintBay(selId); }
+  selId=id; paintBay(id);
+  renderModal();
+  document.getElementById('modal').classList.add('open');
+  setTimeout(()=>{ const el=document.getElementById('drv-placa'); if(el) el.focus(); },100);
+}
+
+function renderModal() {
+  if (!selId) return;
+  const b = bays[selId];
+  const agar = isAgarrada(b);
+  const od   = isOverdue(b);
+
+  // Header color by status
+  let sc, sl;
+  if (agar)                   { sc='var(--agrd)'; sl='Agarrada'; }
+  else if (b.status==='chamando') { sc='var(--cham)'; sl='Chamando · a caminho'; }
+  else if (b.status==='ocupada')  { sc='var(--ocup)'; sl='Ocupada'; }
+  else                            { sc='var(--livre)'; sl='Livre'; }
+
+  const agarBanner = agar ? `<div class="agar-banner">
+    <span style="font-size:20px;">⚠️</span>
+    <div><div class="agar-banner-title">Vaga Agarrada · ${ONDAS[getBayWaveIdx(b)].n}</div>
+    <div class="agar-banner-sub">Onda encerrada. Libere ou chame novo veículo para adiantar.</div></div>
+  </div>` : '';
+
+  const odBanner = od && !agar ? `<div class="warn-banner">⚠️ Vaga ocupada há mais de 20 minutos</div>` : '';
+
+  // Action buttons by status
+  let actions = '';
+  if (b.status === 'livre') {
+    actions = `<div class="action-row">
+      <div class="act-btn act-cham" onclick="doChamando()">📞 Chamando</div>
+      <div class="act-btn act-ocup" onclick="doOcupar()">✅ Ocupar Vaga</div>
+    </div>`;
+  } else if (b.status === 'chamando') {
+    actions = `<div class="action-row">
+      <div class="act-btn act-ocup"  onclick="doOcupar()">✅ Ocupar Vaga</div>
+      <div class="act-btn act-livre" onclick="doLiberar()">🔓 Liberar Vaga</div>
+    </div>`;
+  } else { // ocupada or agarrada
+    actions = `<div class="action-row">
+      <div class="act-btn act-cham"  onclick="doChamando()">📞 Chamar novo</div>
+      <div class="act-btn act-livre" onclick="doLiberar()">🔓 Liberar Vaga</div>
+    </div>`;
+  }
+
+  const timer = elapsedStr(b);
+
+  document.getElementById('modal-box').innerHTML=`
+    <div class="modal-head">
+      <div style="display:flex;align-items:center;">
+        <div class="modal-badge" style="background:${sc}22;color:${sc};border-color:${sc};">${selId}</div>
+        <div class="modal-info">
+          <div class="modal-title">Vaga ${selId}</div>
+          <div class="modal-sub" style="color:${sc};">${sl}${b.motorista?' · '+b.motorista:''}${b.status!=='livre'?' · '+timer:''}</div>
+        </div>
+      </div>
+      <button class="close-btn" onclick="closeModal()">✕</button>
+    </div>
+    ${agarBanner}${odBanner}
+    <div class="sect-label">Placa</div>
+    <input id="drv-placa" class="drv-input" type="text" value="${b.placa}"
+      placeholder="Ex: ABC-1234" autocomplete="off" style="text-transform:uppercase;"
+      oninput="bays[${selId}].placa=this.value.toUpperCase()"/>
+    <div class="sect-label">Motorista</div>
+    <input id="drv" class="drv-input" type="text" value="${b.motorista}"
+      placeholder="Nome do motorista" autocomplete="off"
+      oninput="bays[${selId}].motorista=this.value"/>
+    <div class="sect-label">Ação</div>
+    ${actions}`;
+}
+
+function bgClose(e) { if(e.target===document.getElementById('modal')) closeModal(); }
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  if (selId) { paintBay(selId); selId=null; }
+}
+
+// ── ACTIONS ──────────────────────────────────────────
+function readInputs() {
+  const placa = (document.getElementById('drv-placa')?.value||'').trim().toUpperCase() || bays[selId].placa;
+  const moto  = (document.getElementById('drv')?.value||'').trim() || bays[selId].motorista;
+  bays[selId].placa     = placa;
+  bays[selId].motorista = moto;
+  return { placa, moto };
+}
+
+function doChamando() {
+  if (!selId) return;
+  const { placa, moto } = readInputs();
+  const now = Date.now();
+  bays[selId].status     = 'chamando';
+  bays[selId].chamandoAt = now;
+  bays[selId].statusAt   = now;
+  paintBay(selId);
+  renderModal();
+  persistBay(selId, { status:'chamando', placa, motorista:moto, chamando_em: new Date(now).toISOString() });
+  toast(`📞 Chamando para Vaga ${selId}`, 'ok');
+}
+
+function doOcupar() {
+  if (!selId) return;
+  const { placa, moto } = readInputs();
+  const now = Date.now();
+  bays[selId].status    = 'ocupada';
+  bays[selId].ocupadoAt = now;
+  bays[selId].statusAt  = now;
+  if (!bays[selId].chamandoAt) bays[selId].chamandoAt = now;
+  paintBay(selId);
+  renderModal();
+  persistBay(selId, { status:'ocupada', placa, motorista:moto, ocupado_em: new Date(now).toISOString(), chamando_em: new Date(bays[selId].chamandoAt).toISOString() });
+  toast(`✅ Vaga ${selId} ocupada`, 'ok');
+}
+
+function doLiberar() {
+  if (!selId) return;
+  const id = selId;
+  persistLiberation(id);
+  const now = Date.now();
+  bays[id].status     = 'livre';
+  bays[id].placa      = '';
+  bays[id].motorista  = '';
+  bays[id].chamandoAt = null;
+  bays[id].ocupadoAt  = null;
+  bays[id].statusAt   = null;
+  paintBay(id);
+  persistBay(id, { status:'livre', placa:'', motorista:'', chamando_em:null, ocupado_em:null });
+  toast(`🔓 Vaga ${id} liberada`, 'ok');
+  closeModal();
+}
+
+// ── RESET ALL ─────────────────────────────────────────
+async function resetAllBays() {
+  if (!confirm('Resetar TODAS as 50 vagas para LIVRE?\n\nEsta ação não pode ser desfeita.')) return;
+  const now = new Date().toISOString();
+  for (let i=1; i<=50; i++) {
+    bays[i] = { id:i, status:'livre', placa:'', motorista:'', chamandoAt:null, ocupadoAt:null, statusAt:null };
+    paintBay(i);
+  }
+  renderWaves();
+  toast('Todas as vagas resetadas', 'ok');
+  if (sb) {
+    // Upsert de todas as 50 vagas garante que a tabela fica completa
+    const rows = [];
+    for (let i=1; i<=50; i++) rows.push({ id:i, status:'livre', placa:'', motorista:'', atualizado_em:now });
+    try { await sb.from('vagas').upsert(rows, { onConflict:'id' }); }
+    catch(e) { console.warn('Erro reset Supabase', e); }
+    try { await sb.from('vagas').update({ chamando_em:null, ocupado_em:null }).gte('id',1); } catch(e) {}
+  }
+}
+
+// ── LOG ──────────────────────────────────────────────
+function addLogEntry(r) {
+  calls.unshift(r);
+  if (calls.length > 30) calls.pop();
+  renderLog();
+}
+function renderLog() {
+  const el = document.getElementById('log');
+  if (!calls.length) { el.innerHTML='<div class="log-empty">Nenhum registro ainda.</div>'; return; }
+  el.innerHTML = calls.map(r => {
+    const name  = r.motorista || 'Sem motorista';
+    const placa = r.placa     || '';
+    const hora  = r.liberado_em ? fmt(new Date(r.liberado_em)) : (r.chamado_em ? fmt(new Date(r.chamado_em)) : '');
+    const ocMin = r.tempo_ocupado_seg  ? Math.round(r.tempo_ocupado_seg/60)+'min' : '';
+    return `<div class="log-row">
+      <div class="log-badge">V.${r.vaga_id}</div>
+      <div class="log-name">${name}${placa?' · '+placa:''}</div>
+      <div class="log-time">${ocMin?ocMin+' ':''} ${hora}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── TIMER ────────────────────────────────────────────
+function startTimer() {
+  if (timerTm) clearInterval(timerTm);
+  timerTm = setInterval(tick, 1000);
+  renderTimer();
+}
+function tick() {
+  if (timer>0) timer--;
+  renderTimer();
+  tickBayTimers();
+  renderWaves();
+  if (currentWavePanelIdx!==null) renderWavePanel();
+  if (timer===0) toast('⚠️ Ciclo encerrado! Reinicie o temporizador.', 'warn');
+}
+
+// ── BAY TIMERS ───────────────────────────────────────
+function elapsedStr(bay) {
+  // For occupied/chamando: count from statusAt. For livre: show 00:00 (stopped).
+  if (!bay || bay.status==='livre' || !bay.statusAt) return '00:00';
+  const sec = Math.floor((Date.now() - bay.statusAt) / 1000);
+  return Math.floor(sec/60).toString().padStart(2,'0')+':'+( sec%60).toString().padStart(2,'0');
+}
+
+function tickBayTimers() {
+  for (let i=1;i<=50;i++) {
+    paintBay(i);
+    const tmr=document.getElementById('bt'+i);
+    const pla=document.getElementById('bp'+i);
+    const wrn=document.getElementById('bw'+i);
+    if (!tmr) continue;
+    const b=bays[i];
+    tmr.textContent = elapsedStr(b);
+    if (pla) pla.textContent = (b.status!=='livre'&&b.placa) ? b.placa : '';
+    if (wrn) wrn.style.display = isOverdue(b) ? 'block' : 'none';
+  }
+}
+
+function resetTimer() { timer=1800; renderTimer(); toast('Ciclo reiniciado — 30:00','ok'); }
+function renderTimer() {
+  const m=Math.floor(timer/60), s=timer%60;
+  document.getElementById('timer-txt').textContent=m.toString().padStart(2,'0')+':'+s.toString().padStart(2,'0');
+  const btn=document.getElementById('timer-btn');
+  btn.className = timer===0?'timer-btn urgent':timer<=300?'timer-btn warn':'timer-btn';
+}
+
+// ── TOAST ────────────────────────────────────────────
+let toastTO=null;
+function toast(msg,type) {
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.className='toast show'+(type?' '+type:'');
+  if(toastTO) clearTimeout(toastTO);
+  toastTO=setTimeout(()=>el.classList.remove('show'),3500);
+}
+
+// ── UTILS ────────────────────────────────────────────
+function fmt(d) { return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0'); }
+
+// ── EXPORT ───────────────────────────────────────────
+async function exportHistory() {
+  if (!sb) { toast('Sem conexão.','err'); return; }
+  toast('Buscando dados…','');
+  try {
+    const hoje=new Date();
+    const inicio=new Date(hoje.getFullYear(),hoje.getMonth(),hoje.getDate()).toISOString();
+    const fim   =new Date(hoje.getFullYear(),hoje.getMonth(),hoje.getDate()+1).toISOString();
+    const { data, error } = await sb.from('historico_chamadas').select('*')
+      .gte('chamado_em', inicio).lt('chamado_em', fim)
+      .order('chamado_em',{ascending:true});
+    if (error) throw error;
+    if (!data?.length) { toast('Nenhum registro hoje.','warn'); return; }
+
+    const cols=['Vaga','Motorista','Placa','Ciclo','Chamado às','Chegou à vaga','Liberado às','Tempo chamando (min)','Tempo ocupado (min)','Tempo total (min)'];
+    const rows=[cols];
+    data.forEach(r=>{
+      rows.push([
+        r.vaga_id,
+        r.motorista||'',
+        r.placa||'',
+        r.ciclo||'',
+        r.chamado_em  ? fmt(new Date(r.chamado_em))  : '',
+        r.ocupado_em  ? fmt(new Date(r.ocupado_em))  : '',
+        r.liberado_em ? fmt(new Date(r.liberado_em)) : '',
+        r.tempo_chamando_seg != null ? (r.tempo_chamando_seg/60).toFixed(1) : '',
+        r.tempo_ocupado_seg  != null ? (r.tempo_ocupado_seg/60).toFixed(1)  : '',
+        r.tempo_total_seg    != null ? (r.tempo_total_seg/60).toFixed(1)    : '',
+      ]);
+    });
+    const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+    const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    const dt=hoje.toLocaleDateString('pt-BR').replace(/\//g,'-');
+    a.href=url; a.download='operacao-'+ciclo+'-'+dt+'.csv';
+    a.click(); URL.revokeObjectURL(url);
+    toast(`✅ ${data.length} registros exportados`,'ok');
+  } catch(e) { console.error(e); toast('Erro ao exportar.','err'); }
+}
+
+// ── GLOBALS ──────────────────────────────────────────
+window.setCiclo         = setCiclo;
+window.doChamando       = doChamando;
+window.doOcupar         = doOcupar;
+window.doLiberar        = doLiberar;
+window.closeModal       = closeModal;
+window.bgClose          = bgClose;
+window.resetTimer       = resetTimer;
+window.exportHistory    = exportHistory;
+window.resetAllBays     = resetAllBays;
+window.openWavePanel    = openWavePanel;
+window.closeWavePanel   = closeWavePanel;
+window.bgCloseWave      = bgCloseWave;
+window.openModalFromPanel = openModalFromPanel;
+</script>
+</body>
+</html>
