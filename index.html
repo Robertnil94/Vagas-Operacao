@@ -35,10 +35,10 @@ body {
 .header {
   position: sticky; top: 0; z-index: 20;
   background: var(--surface); border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 14px; gap: 10px; flex-wrap: wrap;
+  display: grid; grid-template-columns: 1fr auto 1fr;
+  align-items: center; padding: 8px 14px; gap: 10px;
 }
-.header-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.header-left { display: flex; align-items: center; gap: 8px; justify-content: center; }
 .conn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text3); flex-shrink: 0; transition: background .4s; }
 .conn-dot.online  { background: var(--livre); box-shadow: 0 0 6px var(--livre); }
 .conn-dot.offline { background: var(--ocup); }
@@ -130,16 +130,18 @@ body {
 .bpl { font-size: 10px; font-weight: 800; line-height: 1; max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
 .btm { font-size: 11px; font-family: 'SF Mono','Fira Code','Consolas',monospace; font-weight: 700; line-height: 1; }
 .bwrn {
-  position: absolute; top: 3px; right: 4px;
-  font-size: 11px; line-height: 1; display: none;
+  position: absolute; top: 2px; left: 50%; transform: translateX(-50%);
+  font-size: 14px; line-height: 1; display: none;
 }
 
 .livre    { background: var(--livre-bg); color: var(--livre); border-color: var(--livre-bd); }
 .chamando { background: var(--cham-bg);  color: var(--cham);  border-color: var(--cham-bd); animation: champulse 1.8s infinite; }
 .ocupada  { background: var(--ocup-bg);  color: var(--ocup);  border-color: var(--ocup-bd); }
 .agarrada { background: var(--agrd-bg);  color: var(--agrd);  border-color: var(--agrd-bd); animation: agrdpulse 2s infinite; }
+.overdue  { background: rgba(248,81,73,.45) !important; color: #fff !important; border-color: #f85149 !important; animation: overdpulse .9s infinite !important; }
 @keyframes champulse { 50% { border-color: var(--cham); box-shadow: 0 0 8px rgba(88,166,255,.4); } }
 @keyframes agrdpulse { 50% { border-color: var(--agrd); box-shadow: 0 0 8px rgba(240,136,62,.4); } }
+@keyframes overdpulse { 0%,100% { box-shadow: 0 0 0 0 rgba(248,81,73,0); } 50% { box-shadow: 0 0 16px 4px rgba(248,81,73,.7); } }
 
 /* ── LEGEND ──────────────────────────────────────── */
 .legend { display: flex; gap: 12px; flex-wrap: wrap; padding: 0 14px 10px; }
@@ -433,7 +435,7 @@ function isOverdue(bay) {
 
 // ── STATE ────────────────────────────────────────────
 let bays = {};
-for (let i=1; i<=50; i++) bays[i] = { id:i, status:'livre', placa:'', motorista:'', chamandoAt:null, ocupadoAt:null, statusAt:null };
+for (let i=1; i<=50; i++) bays[i] = { id:i, status:'livre', placa:'', motorista:'', obs:'', chamandoAt:null, ocupadoAt:null, statusAt:null };
 
 let selId   = null;
 let calls   = [];
@@ -463,6 +465,7 @@ async function loadBays() {
         status:     st,
         placa:      r.placa      || '',
         motorista:  r.motorista  || '',
+        obs:        r.obs        || '',
         chamandoAt: r.chamando_em ? new Date(r.chamando_em).getTime() : null,
         ocupadoAt:  r.ocupado_em  ? new Date(r.ocupado_em).getTime()  : null,
         statusAt:   r.atualizado_em ? new Date(r.atualizado_em).getTime() : null,
@@ -494,6 +497,7 @@ function subscribeRT() {
         status:    newSt,
         placa:     r.placa     || '',
         motorista: r.motorista || '',
+        obs:       r.obs       || '',
         chamandoAt: r.chamando_em ? new Date(r.chamando_em).getTime() : null,
         ocupadoAt:  r.ocupado_em  ? new Date(r.ocupado_em).getTime()  : null,
         statusAt:   r.atualizado_em ? new Date(r.atualizado_em).getTime() : null,
@@ -535,12 +539,13 @@ async function persistBay(id, upd) {
   } catch(e) {
     console.warn('Erro ao salvar vaga', e);
   }
-  // Timing columns — silently ignored if migration not applied yet
-  const timings = {};
-  if ('chamando_em' in upd) timings.chamando_em = upd.chamando_em;
-  if ('ocupado_em'  in upd) timings.ocupado_em  = upd.ocupado_em;
-  if (Object.keys(timings).length) {
-    try { await sb.from('vagas').update(timings).eq('id', id); } catch(e) {}
+  // Extended columns — silently ignored if migration not applied yet
+  const ext = {};
+  if ('chamando_em' in upd) ext.chamando_em = upd.chamando_em;
+  if ('ocupado_em'  in upd) ext.ocupado_em  = upd.ocupado_em;
+  if ('obs'         in upd) ext.obs          = upd.obs ?? '';
+  if (Object.keys(ext).length) {
+    try { await sb.from('vagas').update(ext).eq('id', id); } catch(e) {}
   }
 }
 
@@ -591,7 +596,8 @@ function paintBay(id, el) {
   if (!el) return;
   const b = bays[id];
   const cls = isAgarrada(b) ? 'agarrada' : b.status;
-  el.className = 'bay ' + cls + (selId===id ? ' sel' : '');
+  const od  = isOverdue(b) ? ' overdue' : '';
+  el.className = 'bay ' + cls + od + (selId===id ? ' sel' : '');
 }
 
 // ── WAVES ────────────────────────────────────────────
@@ -787,6 +793,11 @@ function renderModal() {
     <input id="drv" class="drv-input" type="text" value="${b.motorista}"
       placeholder="Nome do motorista" autocomplete="off"
       oninput="bays[${selId}].motorista=this.value"/>
+    <div class="sect-label">Observação</div>
+    <textarea id="drv-obs" class="drv-input" rows="2"
+      placeholder="Observações do fiscal (opcional)"
+      style="resize:none;font-size:13px;font-weight:500;"
+      oninput="bays[${selId}].obs=this.value">${b.obs||''}</textarea>
     <div class="sect-label">Ação</div>
     ${actions}`;
 }
@@ -801,9 +812,11 @@ function closeModal() {
 function readInputs() {
   const placa = (document.getElementById('drv-placa')?.value||'').trim().toUpperCase() || bays[selId].placa;
   const moto  = (document.getElementById('drv')?.value||'').trim() || bays[selId].motorista;
+  const obs   = (document.getElementById('drv-obs')?.value||'').trim();
   bays[selId].placa     = placa;
   bays[selId].motorista = moto;
-  return { placa, moto };
+  bays[selId].obs       = obs;
+  return { placa, moto, obs };
 }
 
 function doChamando() {
@@ -815,7 +828,7 @@ function doChamando() {
   bays[selId].statusAt   = now;
   paintBay(selId);
   renderModal();
-  persistBay(selId, { status:'chamando', placa, motorista:moto, chamando_em: new Date(now).toISOString() });
+  persistBay(selId, { status:'chamando', placa, motorista:moto, obs, chamando_em: new Date(now).toISOString() });
   toast(`📞 Chamando para Vaga ${selId}`, 'ok');
 }
 
@@ -829,7 +842,7 @@ function doOcupar() {
   if (!bays[selId].chamandoAt) bays[selId].chamandoAt = now;
   paintBay(selId);
   renderModal();
-  persistBay(selId, { status:'ocupada', placa, motorista:moto, ocupado_em: new Date(now).toISOString(), chamando_em: new Date(bays[selId].chamandoAt).toISOString() });
+  persistBay(selId, { status:'ocupada', placa, motorista:moto, obs, ocupado_em: new Date(now).toISOString(), chamando_em: new Date(bays[selId].chamandoAt).toISOString() });
   toast(`✅ Vaga ${selId} ocupada`, 'ok');
 }
 
@@ -845,7 +858,7 @@ function doLiberar() {
   bays[id].ocupadoAt  = null;
   bays[id].statusAt   = null;
   paintBay(id);
-  persistBay(id, { status:'livre', placa:'', motorista:'', chamando_em:null, ocupado_em:null });
+  persistBay(id, { status:'livre', placa:'', motorista:'', obs:'', chamando_em:null, ocupado_em:null });
   toast(`🔓 Vaga ${id} liberada`, 'ok');
   closeModal();
 }
