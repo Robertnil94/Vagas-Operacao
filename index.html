@@ -456,7 +456,7 @@ function isOverdue(bay) {
 
 // ── STATE ────────────────────────────────────────────
 let bays = {};
-for (let i=1; i<=50; i++) bays[i] = { id:i, status:'livre', placa:'', motorista:'', obs:'', chamandoAt:null, ocupadoAt:null, statusAt:null };
+for (let i=1; i<=51; i++) bays[i] = { id:i, status:'livre', placa:'', motorista:'', obs:'', chamandoAt:null, ocupadoAt:null, statusAt:null };
 
 let selId   = null;
 let calls   = [];
@@ -650,7 +650,7 @@ async function persistLiberation(id) {
 // ── UI INIT ──────────────────────────────────────────
 function initUI() {
   const grid = document.getElementById('bay-grid');
-  for (let i=1; i<=50; i++) grid.appendChild(mkBay(i));
+  for (let i=1; i<=51; i++) grid.appendChild(mkBay(i));
 }
 
 function mkBay(id) {
@@ -693,7 +693,7 @@ function renderWaves() {
   }
 
   const stuckCount = new Array(ONDAS.length).fill(0);
-  for (let i=1; i<=50; i++) {
+  for (let i=1; i<=51; i++) {
     if (!isAgarrada(bays[i])) continue;
     const wIdx = getBayWaveIdx(bays[i]);
     if (wIdx !== null) stuckCount[wIdx]++;
@@ -706,7 +706,7 @@ function renderWaves() {
     if (!chip) return;
     const sc = stuckCount[i];
     const closed = waveClosedCount[ciclo+i] || 0;
-    const pending = Array.from({length:50},(_,k)=>bays[k+1]).filter(b=>b.status!=='livre'&&getBayWaveIdx(b)===i).length;
+    const pending = Array.from({length:51},(_,k)=>bays[k+1]).filter(b=>b.status!=='livre'&&getBayWaveIdx(b)===i).length;
     chip.querySelector('.wc-badge-wrap').innerHTML =
       (sc>0 ? `<span class="wc-badge">⚠ ${sc}</span>` : '') +
       (closed>0 ? `<span class="wc-badge" style="background:var(--livre-bg);color:var(--livre);border-color:var(--livre-bd);">✓${closed}</span>` : '') +
@@ -760,7 +760,7 @@ function renderWavePanel() {
   }
 
   let nL=0,nC=0,nO=0,nA=0;
-  for (let i=1;i<=50;i++) {
+  for (let i=1;i<=51;i++) {
     const b=bays[i];
     if (b.status==='livre') nL++;
     else if (isAgarrada(b)) nA++;
@@ -776,7 +776,7 @@ function renderWavePanel() {
   </div>`;
 
   let tiles='';
-  for (let i=1;i<=50;i++) {
+  for (let i=1;i<=51;i++) {
     const b=bays[i];
     const cls=isAgarrada(b)?'agarrada':b.status;
     const timer=elapsedStr(b);
@@ -948,7 +948,7 @@ function doLiberar() {
 async function resetAllBays() {
   if (!confirm('Resetar TODAS as 50 vagas para LIVRE?\n\nEsta ação não pode ser desfeita.')) return;
   const now = new Date().toISOString();
-  for (let i=1; i<=50; i++) {
+  for (let i=1; i<=51; i++) {
     bays[i] = { id:i, status:'livre', placa:'', motorista:'', chamandoAt:null, ocupadoAt:null, statusAt:null };
     paintBay(i);
   }
@@ -957,7 +957,7 @@ async function resetAllBays() {
   if (sb) {
     // Upsert de todas as 50 vagas garante que a tabela fica completa
     const rows = [];
-    for (let i=1; i<=50; i++) rows.push({ id:i, status:'livre', placa:'', motorista:'', atualizado_em:now });
+    for (let i=1; i<=51; i++) rows.push({ id:i, status:'livre', placa:'', motorista:'', atualizado_em:now });
     try { await sb.from('vagas').upsert(rows, { onConflict:'id' }); }
     catch(e) { console.warn('Erro reset Supabase', e); }
     try { await sb.from('vagas').update({ chamando_em:null, ocupado_em:null }).gte('id',1); } catch(e) {}
@@ -1010,7 +1010,7 @@ function elapsedStr(bay) {
 }
 
 function tickBayTimers() {
-  for (let i=1;i<=50;i++) {
+  for (let i=1;i<=51;i++) {
     paintBay(i);
     const tmr=document.getElementById('bt'+i);
     const pla=document.getElementById('bp'+i);
