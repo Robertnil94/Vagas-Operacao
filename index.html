@@ -464,6 +464,8 @@ let timer   = 1800;
 let timerTm = null;
 let sb      = null;
 let currentWavePanelIdx = null;
+let closedToday    = 0;
+let waveClosedCount = {};
 
 // ── SUPABASE ─────────────────────────────────────────
 const SUPABASE_URL = 'https://oouwhcxxsspmdultfkjf.supabase.co';
@@ -476,8 +478,13 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 })();
 
 async function loadBays() {
+  // Timeout de 10s para não ficar travado em "Conectando…"
+  const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000));
   try {
-    const { data, error } = await sb.from('vagas').select('*').order('id');
+    const { data, error } = await Promise.race([
+      sb.from('vagas').select('*').order('id'),
+      timeout
+    ]);
     if (error) throw error;
     data.forEach(r => {
       const st = r.status || 'livre';
@@ -503,7 +510,12 @@ async function loadBays() {
     toast('Conectado!', 'ok');
   } catch(e) {
     console.error(e);
-    document.getElementById('cfg').querySelector('.cfg-desc').textContent = 'Erro ao conectar. Recarregue.';
+    const desc = document.getElementById('cfg').querySelector('.cfg-desc');
+    if (e.message === 'timeout') {
+      desc.textContent = '⚠️ Supabase não respondeu. Verifique se o projeto está ativo e recarregue.';
+    } else {
+      desc.textContent = '⚠️ Erro ao conectar: ' + (e.message || 'verifique o Supabase') + '. Recarregue.';
+    }
   }
 }
 
@@ -534,8 +546,7 @@ function subscribeRT() {
     .subscribe();
 }
 
-let closedToday = 0;
-let waveClosedCount = {}; // { waveIdx: N }
+// closedToday e waveClosedCount declarados no bloco de estado acima
 
 async function loadHistory() {
   try {
