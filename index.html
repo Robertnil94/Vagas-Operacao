@@ -1025,9 +1025,12 @@ function tickBayTimers() {
 
 function resetTimer() { timer=1800; renderTimer(); toast('Ciclo reiniciado — 30:00','ok'); }
 function renderTimer() {
+  // Timer display foi removido do header — função mantida para não quebrar tick()
+  const el  = document.getElementById('timer-txt');
+  const btn = document.getElementById('timer-btn');
+  if (!el || !btn) return;
   const m=Math.floor(timer/60), s=timer%60;
-  document.getElementById('timer-txt').textContent=m.toString().padStart(2,'0')+':'+s.toString().padStart(2,'0');
-  const btn=document.getElementById('timer-btn');
+  el.textContent=m.toString().padStart(2,'0')+':'+s.toString().padStart(2,'0');
   btn.className = timer===0?'timer-btn urgent':timer<=300?'timer-btn warn':'timer-btn';
 }
 
